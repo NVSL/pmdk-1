@@ -55,6 +55,7 @@
 #include "sync.h"
 #include "tx.h"
 #include "sys_util.h"
+#include "timing.h"
 
 /*
  * The variable from which the config is directly loaded. The contained string
@@ -1877,6 +1878,7 @@ pmemobj_close(PMEMobjpool *pop)
 #endif /* _WIN32 */
 
 	obj_pool_cleanup(pop);
+    timing_print();
 }
 
 /*
