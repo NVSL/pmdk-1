@@ -11,6 +11,7 @@ enum timing_mode {
     durability = 1,
     logging = 2,
     synchronization = 3,
+    allocation = 4,
 };
 
 void timing_init(void);

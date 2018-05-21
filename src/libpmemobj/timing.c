@@ -17,9 +17,8 @@
 typedef struct timing_struct {
     uint64_t current_mode;
     uint64_t t1, t2;
-    uint64_t total[3];
+    uint64_t total[4];
     uint64_t next_ptr;
-    uint64_t reserved;
 } timing_struct;
 
 uint64_t head = 0;
@@ -31,9 +30,9 @@ void timing_init(void) {
 
 void timing_print(void) {
     uint64_t ptr = head;
-    uint64_t total[3] = { 0, 0, 0 };
+    uint64_t total[4] = { 0, 0, 0, 0 };
     while (ptr != 0) {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             total[i] += ((timing_struct *)ptr)->total[i];
             ((timing_struct *)ptr)->total[i] = 0;
         }
@@ -43,6 +42,7 @@ void timing_print(void) {
     fprintf(stdout, "Durability:\t\t%zu\n", total[0]);
     fprintf(stdout, "Logging:\t\t%zu\n", total[1]);
     fprintf(stdout, "Synchronization:\t%zu\n", total[2]);
+    fprintf(stdout, "Allocation:\t\t%zu\n", total[3]);
     uint64_t total_cycles;
     RDTSC(total_cycles);
     total_cycles -= init_cycle;

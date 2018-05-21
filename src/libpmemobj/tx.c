@@ -1911,6 +1911,7 @@ pmemobj_tx_add_common(struct tx *tx, struct tx_range_def *args)
 int
 pmemobj_tx_add_range_direct(const void *ptr, size_t size)
 {
+    timing_start(logging);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -1921,7 +1922,9 @@ pmemobj_tx_add_range_direct(const void *ptr, size_t size)
 
 	if (!OBJ_PTR_FROM_POOL(pop, ptr)) {
 		ERR("object outside of pool");
-		return obj_tx_abort_err(EINVAL);
+	    int ret = obj_tx_abort_err(EINVAL);
+        timing_end(logging);
+        return ret;
 	}
 
 	struct tx_range_def args = {
@@ -1930,7 +1933,9 @@ pmemobj_tx_add_range_direct(const void *ptr, size_t size)
 		.flags = 0,
 	};
 
-	return pmemobj_tx_add_common(tx, &args);
+	int ret = pmemobj_tx_add_common(tx, &args);
+    timing_end(logging);
+    return ret;
 }
 
 /*
@@ -1940,6 +1945,7 @@ pmemobj_tx_add_range_direct(const void *ptr, size_t size)
 int
 pmemobj_tx_xadd_range_direct(const void *ptr, size_t size, uint64_t flags)
 {
+    timing_start(logging);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -1948,12 +1954,16 @@ pmemobj_tx_xadd_range_direct(const void *ptr, size_t size, uint64_t flags)
 
 	if (!OBJ_PTR_FROM_POOL(tx->pop, ptr)) {
 		ERR("object outside of pool");
-		return obj_tx_abort_err(EINVAL);
+		int ret = obj_tx_abort_err(EINVAL);
+        timing_end(logging);
+        return ret;
 	}
 
 	if (flags & ~POBJ_XADD_VALID_FLAGS) {
 		ERR("unknown flags 0x%" PRIx64, flags & ~POBJ_XADD_VALID_FLAGS);
-		return obj_tx_abort_err(EINVAL);
+		int ret = obj_tx_abort_err(EINVAL);
+        timing_end(logging);
+        return ret;
 	}
 
 	struct tx_range_def args = {
@@ -1962,7 +1972,9 @@ pmemobj_tx_xadd_range_direct(const void *ptr, size_t size, uint64_t flags)
 		.flags = flags,
 	};
 
-	return pmemobj_tx_add_common(tx, &args);
+	int ret = pmemobj_tx_add_common(tx, &args);
+    timing_end(logging);
+    return ret;
 }
 
 /*
@@ -1971,6 +1983,7 @@ pmemobj_tx_xadd_range_direct(const void *ptr, size_t size, uint64_t flags)
 int
 pmemobj_tx_add_range(PMEMoid oid, uint64_t hoff, size_t size)
 {
+    timing_start(logging);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -1979,7 +1992,9 @@ pmemobj_tx_add_range(PMEMoid oid, uint64_t hoff, size_t size)
 
 	if (oid.pool_uuid_lo != tx->pop->uuid_lo) {
 		ERR("invalid pool uuid");
-		return obj_tx_abort_err(EINVAL);
+		int ret = obj_tx_abort_err(EINVAL);
+        timing_end(logging);
+        return ret;
 	}
 	ASSERT(OBJ_OID_IS_VALID(tx->pop, oid));
 
@@ -1989,7 +2004,9 @@ pmemobj_tx_add_range(PMEMoid oid, uint64_t hoff, size_t size)
 		.flags = 0,
 	};
 
-	return pmemobj_tx_add_common(tx, &args);
+	int ret = pmemobj_tx_add_common(tx, &args);
+    timing_end(logging);
+    return ret;
 }
 
 /*
@@ -1998,6 +2015,7 @@ pmemobj_tx_add_range(PMEMoid oid, uint64_t hoff, size_t size)
 int
 pmemobj_tx_xadd_range(PMEMoid oid, uint64_t hoff, size_t size, uint64_t flags)
 {
+    timing_start(logging);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -2006,13 +2024,17 @@ pmemobj_tx_xadd_range(PMEMoid oid, uint64_t hoff, size_t size, uint64_t flags)
 
 	if (oid.pool_uuid_lo != tx->pop->uuid_lo) {
 		ERR("invalid pool uuid");
-		return obj_tx_abort_err(EINVAL);
+		int ret = obj_tx_abort_err(EINVAL);
+        timing_end(logging);
+        return ret;
 	}
 	ASSERT(OBJ_OID_IS_VALID(tx->pop, oid));
 
 	if (flags & ~POBJ_XADD_VALID_FLAGS) {
 		ERR("unknown flags 0x%" PRIx64, flags & ~POBJ_XADD_VALID_FLAGS);
-		return obj_tx_abort_err(EINVAL);
+		int ret = obj_tx_abort_err(EINVAL);
+        timing_end(logging);
+        return ret;
 	}
 
 	struct tx_range_def args = {
@@ -2021,7 +2043,9 @@ pmemobj_tx_xadd_range(PMEMoid oid, uint64_t hoff, size_t size, uint64_t flags)
 		.flags = flags,
 	};
 
-	return pmemobj_tx_add_common(tx, &args);
+	int ret = pmemobj_tx_add_common(tx, &args);
+    timing_end(logging);
+    return ret;
 }
 
 /*
