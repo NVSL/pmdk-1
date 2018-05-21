@@ -36,6 +36,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "util.h"
+#include "timing.h"
 
 typedef void (*persist_fn)(void *base, const void *, size_t);
 typedef void (*flush_fn)(void *base, const void *, size_t);
@@ -66,13 +67,17 @@ struct pmem_ops {
 static force_inline void
 pmemops_persist(const struct pmem_ops *p_ops, const void *d, size_t s)
 {
+    timing_start(durability);
 	p_ops->persist(p_ops->base, d, s);
+    timing_end(durability);
 }
 
 static force_inline void
 pmemops_flush(const struct pmem_ops *p_ops, const void *d, size_t s)
 {
+    timing_start(durability);
 	p_ops->flush(p_ops->base, d, s);
+    timing_end(durability);
 }
 
 static force_inline void
@@ -85,14 +90,20 @@ static force_inline void *
 pmemops_memcpy_persist(const struct pmem_ops *p_ops, void *dest,
 		const void *src, size_t len)
 {
-	return p_ops->memcpy_persist(p_ops->base, dest, src, len);
+    timing_start(durability);
+	void *ret = p_ops->memcpy_persist(p_ops->base, dest, src, len);
+    timing_end(durability);
+    return ret;
 }
 
 static force_inline void *
 pmemops_memset_persist(const struct pmem_ops *p_ops, void *dest, int c,
 		size_t len)
 {
-	return p_ops->memset_persist(p_ops->base, dest, c, len);
+    timing_start(durability);
+	void *ret = p_ops->memset_persist(p_ops->base, dest, c, len);
+    timing_end(durability);
+    return ret;
 }
 
 #endif

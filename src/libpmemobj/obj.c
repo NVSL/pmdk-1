@@ -1704,7 +1704,9 @@ pmemobj_openU(const char *path, const char *layout)
 {
 	LOG(3, "path %s layout %s", path, layout);
 
-	return obj_open_common(path, layout, Open_cow, 1);
+	PMEMobjpool *pop = obj_open_common(path, layout, Open_cow, 1);
+    timing_init();
+    return pop;
 }
 
 #ifndef _WIN32
