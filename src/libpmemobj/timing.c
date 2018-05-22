@@ -49,11 +49,13 @@ void timing_print(void) {
     fprintf(out, "Synchronization,%zu\n", total[2]);
     fprintf(out, "Allocation,%zu\n", total[3]);
     fprintf(out, "Errors,%d\n", total_errors);
-    uint64_t total_cycles;
-    RDTSC(total_cycles);
-    total_cycles -= init_cycle;
+    uint64_t print_cycle;
+    RDTSC(print_cycle);
+    asm volatile("mfence" ::: "memory");
+    uint64_t total_cycles = print_cycle - init_cycle;
     fprintf(out, "Total,%zu\n", total_cycles);
-    RDTSC(init_cycle);
+    asm volatile("mfence" ::: "memory");
+    timing_init();
 }
 
 void timing_cleanup(void) {
