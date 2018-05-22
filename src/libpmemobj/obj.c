@@ -1235,6 +1235,7 @@ PMEMobjpool *
 pmemobj_createU(const char *path, const char *layout,
 		size_t poolsize, mode_t mode)
 {
+    timing_init();
 	LOG(3, "path %s layout %s poolsize %zu mode %o",
 			path, layout, poolsize, mode);
 
@@ -1702,10 +1703,10 @@ static inline
 PMEMobjpool *
 pmemobj_openU(const char *path, const char *layout)
 {
+    timing_init();
 	LOG(3, "path %s layout %s", path, layout);
 
 	PMEMobjpool *pop = obj_open_common(path, layout, Open_cow, 1);
-    timing_init();
     return pop;
 }
 

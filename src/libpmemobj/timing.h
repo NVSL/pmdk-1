@@ -17,7 +17,7 @@ enum timing_mode {
 void timing_init(void);
 void timing_cleanup(void);
 void timing_print(void);
-void timing_start(uint64_t mode);
-void timing_end(uint64_t mode);
+void timing_start(uint32_t mode);
+void timing_end(uint32_t mode);
 
 #endif
