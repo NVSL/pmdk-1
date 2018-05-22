@@ -2095,6 +2095,7 @@ int
 pmemobj_alloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	uint64_t type_num, pmemobj_constr constructor, void *arg)
 {
+    timing_start(allocation);
 	LOG(3, "pop %p oidp %p size %zu type_num %llx constructor %p arg %p",
 		pop, oidp, size, (unsigned long long)type_num,
 		constructor, arg);
@@ -2105,11 +2106,14 @@ pmemobj_alloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	if (size == 0) {
 		ERR("allocation with size 0");
 		errno = EINVAL;
+        timing_end(allocation);
 		return -1;
 	}
 
-	return obj_alloc_construct(pop, oidp, size, type_num,
+	int ret = obj_alloc_construct(pop, oidp, size, type_num,
 			0, constructor, arg);
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2120,6 +2124,7 @@ pmemobj_xalloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	uint64_t type_num, uint64_t flags,
 	pmemobj_constr constructor, void *arg)
 {
+    timing_start(allocation);
 	LOG(3, "pop %p oidp %p size %zu type_num %llx flags %llx "
 		"constructor %p arg %p",
 		pop, oidp, size, (unsigned long long)type_num,
@@ -2132,6 +2137,7 @@ pmemobj_xalloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	if (size == 0) {
 		ERR("allocation with size 0");
 		errno = EINVAL;
+        timing_end(allocation);
 		return -1;
 	}
 
@@ -2139,11 +2145,14 @@ pmemobj_xalloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 		ERR("unknown flags 0x%" PRIx64,
 				flags & ~POBJ_TX_XALLOC_VALID_FLAGS);
 		errno = EINVAL;
+        timing_end(allocation);
 		return -1;
 	}
 
-	return obj_alloc_construct(pop, oidp, size, type_num,
+	int ret = obj_alloc_construct(pop, oidp, size, type_num,
 			flags, constructor, arg);
+    timing_end(allocation);
+    return ret;
 }
 
 /* arguments for constructor_realloc and constructor_zrealloc */
@@ -2164,6 +2173,7 @@ int
 pmemobj_zalloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 		uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, "pop %p oidp %p size %zu type_num %llx",
 			pop, oidp, size, (unsigned long long)type_num);
 
@@ -2173,11 +2183,14 @@ pmemobj_zalloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	if (size == 0) {
 		ERR("allocation with size 0");
 		errno = EINVAL;
+        timing_end(allocation);
 		return -1;
 	}
 
-	return obj_alloc_construct(pop, oidp, size, type_num, POBJ_FLAG_ZERO,
+	int ret = obj_alloc_construct(pop, oidp, size, type_num, POBJ_FLAG_ZERO,
 		NULL, NULL);
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2186,6 +2199,7 @@ pmemobj_zalloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 static void
 obj_free(PMEMobjpool *pop, PMEMoid *oidp)
 {
+    timing_start(allocation);
 	ASSERTne(oidp, NULL);
 
 	struct redo_log *redo = pmalloc_redo_hold(pop);
@@ -2199,6 +2213,7 @@ obj_free(PMEMobjpool *pop, PMEMoid *oidp)
 			0, 0, 0, &ctx);
 
 	pmalloc_redo_release(pop);
+    timing_end(allocation);
 }
 
 /*
@@ -2314,6 +2329,7 @@ int
 pmemobj_realloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 		uint64_t type_num)
 {
+    timing_start(allocation);
 	ASSERTne(oidp, NULL);
 
 	LOG(3, "pop %p oid.off 0x%016" PRIx64 " size %zu type_num %" PRIu64,
@@ -2323,7 +2339,9 @@ pmemobj_realloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	_POBJ_DEBUG_NOTICE_IN_TX();
 	ASSERT(OBJ_OID_IS_VALID(pop, *oidp));
 
-	return obj_realloc_common(pop, oidp, size, (type_num_t)type_num, 0);
+	int ret = obj_realloc_common(pop, oidp, size, (type_num_t)type_num, 0);
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2333,6 +2351,7 @@ int
 pmemobj_zrealloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 		uint64_t type_num)
 {
+    timing_start(allocation);
 	ASSERTne(oidp, NULL);
 
 	LOG(3, "pop %p oid.off 0x%016" PRIx64 " size %zu type_num %" PRIu64,
@@ -2342,7 +2361,9 @@ pmemobj_zrealloc(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	_POBJ_DEBUG_NOTICE_IN_TX();
 	ASSERT(OBJ_OID_IS_VALID(pop, *oidp));
 
-	return obj_realloc_common(pop, oidp, size, (type_num_t)type_num, 1);
+	int ret = obj_realloc_common(pop, oidp, size, (type_num_t)type_num, 1);
+    timing_end(allocation);
+    return ret;
 }
 
 /* arguments for constructor_strdup */
@@ -2377,6 +2398,7 @@ int
 pmemobj_strdup(PMEMobjpool *pop, PMEMoid *oidp, const char *s,
 		uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, "pop %p oidp %p string %s type_num %" PRIu64,
 	    pop, oidp, s, type_num);
 
@@ -2385,6 +2407,7 @@ pmemobj_strdup(PMEMobjpool *pop, PMEMoid *oidp, const char *s,
 
 	if (NULL == s) {
 		errno = EINVAL;
+        timing_end(allocation);
 		return -1;
 	}
 
@@ -2392,8 +2415,10 @@ pmemobj_strdup(PMEMobjpool *pop, PMEMoid *oidp, const char *s,
 	carg.size = (strlen(s) + 1) * sizeof(char);
 	carg.s = s;
 
-	return obj_alloc_construct(pop, oidp, carg.size,
+	int ret = obj_alloc_construct(pop, oidp, carg.size,
 		(type_num_t)type_num, 0, constructor_strdup, &carg);
+    timing_end(allocation);
+    return ret;
 }
 
 /* arguments for constructor_wcsdup */
@@ -2429,6 +2454,7 @@ int
 pmemobj_wcsdup(PMEMobjpool *pop, PMEMoid *oidp, const wchar_t *s,
 	uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, "pop %p oidp %p string %S type_num %" PRIu64,
 		    pop, oidp, s, type_num);
 
@@ -2437,6 +2463,7 @@ pmemobj_wcsdup(PMEMobjpool *pop, PMEMoid *oidp, const wchar_t *s,
 
 	if (NULL == s) {
 		errno = EINVAL;
+        timing_end(allocation);
 		return -1;
 	}
 
@@ -2444,8 +2471,10 @@ pmemobj_wcsdup(PMEMobjpool *pop, PMEMoid *oidp, const wchar_t *s,
 	carg.size = (wcslen(s) + 1) * sizeof(wchar_t);
 	carg.s = s;
 
-	return obj_alloc_construct(pop, oidp, carg.size,
+	int ret = obj_alloc_construct(pop, oidp, carg.size,
 		(type_num_t)type_num, 0, constructor_wcsdup, &carg);
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2454,6 +2483,7 @@ pmemobj_wcsdup(PMEMobjpool *pop, PMEMoid *oidp, const wchar_t *s,
 void
 pmemobj_free(PMEMoid *oidp)
 {
+    timing_start(allocation);
 	ASSERTne(oidp, NULL);
 
 	LOG(3, "oid.off 0x%016" PRIx64, oidp->off);
@@ -2461,8 +2491,10 @@ pmemobj_free(PMEMoid *oidp)
 	/* log notice message if used inside a transaction */
 	_POBJ_DEBUG_NOTICE_IN_TX();
 
-	if (oidp->off == 0)
+	if (oidp->off == 0) {
+        timing_end(allocation);
 		return;
+    }
 
 	PMEMobjpool *pop = pmemobj_pool_by_oid(*oidp);
 
@@ -2470,6 +2502,7 @@ pmemobj_free(PMEMoid *oidp)
 	ASSERT(OBJ_OID_IS_VALID(pop, *oidp));
 
 	obj_free(pop, oidp);
+    timing_end(allocation);
 }
 
 /*
@@ -2478,17 +2511,22 @@ pmemobj_free(PMEMoid *oidp)
 size_t
 pmemobj_alloc_usable_size(PMEMoid oid)
 {
+    timing_start(allocation);
 	LOG(3, "oid.off 0x%016" PRIx64, oid.off);
 
-	if (oid.off == 0)
+	if (oid.off == 0) {
+        timing_end(allocation);
 		return 0;
+    }
 
 	PMEMobjpool *pop = pmemobj_pool_by_oid(oid);
 
 	ASSERTne(pop, NULL);
 	ASSERT(OBJ_OID_IS_VALID(pop, oid));
 
-	return (palloc_usable_size(&pop->heap, oid.off));
+	size_t ret = (palloc_usable_size(&pop->heap, oid.off));
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2579,6 +2617,7 @@ static int
 obj_alloc_root(PMEMobjpool *pop, size_t size,
 	pmemobj_constr constructor, void *arg)
 {
+    timing_start(allocation);
 	LOG(3, "pop %p size %zu", pop, size);
 
 	struct carg_realloc carg;
@@ -2605,6 +2644,7 @@ obj_alloc_root(PMEMobjpool *pop, size_t size,
 
 	pmalloc_redo_release(pop);
 
+    timing_end(allocation);
 	return ret;
 }
 

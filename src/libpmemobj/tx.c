@@ -372,6 +372,7 @@ static void
 tx_clear_undo_log(PMEMobjpool *pop, struct pvector_context *undo, int nskip,
 	enum tx_clr_flag flags)
 {
+    timing_start(logging);
 	LOG(7, NULL);
 
 	uint64_t val;
@@ -393,6 +394,7 @@ tx_clear_undo_log(PMEMobjpool *pop, struct pvector_context *undo, int nskip,
 			pvector_pop_back(undo, tx_clear_vec_entry);
 		}
 	}
+    timing_end(logging);
 }
 
 /*
@@ -402,6 +404,7 @@ static void
 tx_abort_alloc(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt,
 	struct lane_tx_runtime *lane)
 {
+    timing_start(allocation);
 	LOG(5, NULL);
 
 	/*
@@ -415,6 +418,7 @@ tx_abort_alloc(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt,
 	tx_clear_undo_log(pop, tx_rt->ctx[UNDO_ALLOC],
 		lane ? lane->actvundo : 0,
 		flags);
+    timing_end(allocation);
 }
 
 /*
@@ -423,9 +427,11 @@ tx_abort_alloc(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt,
 static void
 tx_abort_free(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt)
 {
+    timing_start(allocation);
 	LOG(5, NULL);
 
 	tx_clear_undo_log(pop, tx_rt->ctx[UNDO_FREE], 0, 0);
+    timing_end(allocation);
 }
 
 struct tx_range_data {
@@ -593,9 +599,11 @@ tx_foreach_set(PMEMobjpool *pop, struct tx *tx, struct tx_undo_runtime *tx_rt,
 static void
 tx_abort_restore_range(PMEMobjpool *pop, struct tx *tx, struct tx_range *range)
 {
+    timing_start(logging);
 	tx_restore_range(pop, tx, range);
 	VALGRIND_REMOVE_FROM_TX(OBJ_OFF_TO_PTR(pop, range->offset),
 			range->size);
+    timing_end(logging);
 }
 
 /*
@@ -699,10 +707,12 @@ tx_abort_set(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt, int recovery)
 static void
 tx_post_commit_alloc(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt)
 {
+    timing_start(allocation);
 	LOG(7, NULL);
 
 	tx_clear_undo_log(pop, tx_rt->ctx[UNDO_ALLOC], 0,
 			TX_CLR_FLAG_VG_TX_REMOVE);
+    timing_end(allocation);
 }
 
 /*
@@ -712,10 +722,12 @@ tx_post_commit_alloc(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt)
 static void
 tx_post_commit_free(PMEMobjpool *pop, struct tx_undo_runtime *tx_rt)
 {
+    timing_start(allocation);
 	LOG(7, NULL);
 
 	tx_clear_undo_log(pop, tx_rt->ctx[UNDO_FREE], 0,
 		TX_CLR_FLAG_FREE | TX_CLR_FLAG_VG_TX_REMOVE);
+    timing_end(allocation);
 }
 
 #if VG_PMEMCHECK_ENABLED
@@ -801,12 +813,14 @@ tx_cancel_reservations(PMEMobjpool *pop, struct lane_tx_runtime *lane)
 static void
 tx_flush_range(void *data, void *ctx)
 {
+    timing_start(durability);
 	PMEMobjpool *pop = ctx;
 	struct tx_range_def *range = data;
 	if (!(range->flags & POBJ_FLAG_NO_FLUSH)) {
 		pmemops_flush(&pop->p_ops, OBJ_OFF_TO_PTR(pop, range->offset),
 				range->size);
 	}
+    timing_end(durability);
 }
 
 /*
@@ -2054,6 +2068,7 @@ pmemobj_tx_xadd_range(PMEMoid oid, uint64_t hoff, size_t size, uint64_t flags)
 PMEMoid
 pmemobj_tx_alloc(size_t size, uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -2062,11 +2077,15 @@ pmemobj_tx_alloc(size_t size, uint64_t type_num)
 
 	if (size == 0) {
 		ERR("allocation with size 0");
-		return obj_tx_abort_null(EINVAL);
+		PMEMoid ret = obj_tx_abort_null(EINVAL);
+        timing_end(allocation);
+        return ret;
 	}
 
-	return tx_alloc_common(tx, size, (type_num_t)type_num,
+	PMEMoid ret = tx_alloc_common(tx, size, (type_num_t)type_num,
 			constructor_tx_alloc, ALLOC_ARGS(0));
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2075,6 +2094,7 @@ pmemobj_tx_alloc(size_t size, uint64_t type_num)
 PMEMoid
 pmemobj_tx_zalloc(size_t size, uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -2083,11 +2103,15 @@ pmemobj_tx_zalloc(size_t size, uint64_t type_num)
 
 	if (size == 0) {
 		ERR("allocation with size 0");
-		return obj_tx_abort_null(EINVAL);
+		PMEMoid ret = obj_tx_abort_null(EINVAL);
+        timing_end(allocation);
+        return ret;
 	}
 
-	return tx_alloc_common(tx, size, (type_num_t)type_num,
+	PMEMoid ret = tx_alloc_common(tx, size, (type_num_t)type_num,
 			constructor_tx_alloc, ALLOC_ARGS(POBJ_FLAG_ZERO));
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2096,6 +2120,7 @@ pmemobj_tx_zalloc(size_t size, uint64_t type_num)
 PMEMoid
 pmemobj_tx_xalloc(size_t size, uint64_t type_num, uint64_t flags)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -2104,17 +2129,23 @@ pmemobj_tx_xalloc(size_t size, uint64_t type_num, uint64_t flags)
 
 	if (size == 0) {
 		ERR("allocation with size 0");
-		return obj_tx_abort_null(EINVAL);
+		PMEMoid ret = obj_tx_abort_null(EINVAL);
+        timing_end(allocation);
+        return ret;
 	}
 
 	if (flags & ~POBJ_TX_XALLOC_VALID_FLAGS) {
 		ERR("unknown flags 0x%" PRIx64,
 				flags & ~POBJ_TX_XALLOC_VALID_FLAGS);
-		return obj_tx_abort_null(EINVAL);
+		PMEMoid ret = obj_tx_abort_null(EINVAL);
+        timing_end(allocation);
+        return ret;
 	}
 
-	return tx_alloc_common(tx, size, (type_num_t)type_num,
+	PMEMoid ret = tx_alloc_common(tx, size, (type_num_t)type_num,
 			constructor_tx_alloc, ALLOC_ARGS(flags));
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2123,14 +2154,17 @@ pmemobj_tx_xalloc(size_t size, uint64_t type_num, uint64_t flags)
 PMEMoid
 pmemobj_tx_realloc(PMEMoid oid, size_t size, uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
 	ASSERT_IN_TX(tx);
 	ASSERT_TX_STAGE_WORK(tx);
 
-	return tx_realloc_common(tx, oid, size, type_num,
+	PMEMoid ret = tx_realloc_common(tx, oid, size, type_num,
 			constructor_tx_alloc, constructor_tx_alloc, 0);
+    timing_end(allocation);
+    return ret;
 }
 
 
@@ -2140,15 +2174,18 @@ pmemobj_tx_realloc(PMEMoid oid, size_t size, uint64_t type_num)
 PMEMoid
 pmemobj_tx_zrealloc(PMEMoid oid, size_t size, uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
 	ASSERT_IN_TX(tx);
 	ASSERT_TX_STAGE_WORK(tx);
 
-	return tx_realloc_common(tx, oid, size, type_num,
+	PMEMoid ret = tx_realloc_common(tx, oid, size, type_num,
 			constructor_tx_alloc, constructor_tx_alloc,
 			POBJ_FLAG_ZERO);
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2157,6 +2194,7 @@ pmemobj_tx_zrealloc(PMEMoid oid, size_t size, uint64_t type_num)
 PMEMoid
 pmemobj_tx_strdup(const char *s, uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -2165,20 +2203,27 @@ pmemobj_tx_strdup(const char *s, uint64_t type_num)
 
 	if (NULL == s) {
 		ERR("cannot duplicate NULL string");
-		return obj_tx_abort_null(EINVAL);
+		PMEMoid ret = obj_tx_abort_null(EINVAL);
+        timing_end(allocation);
+        return ret;
 	}
 
 	size_t len = strlen(s);
 
-	if (len == 0)
-		return tx_alloc_common(tx, sizeof(char), (type_num_t)type_num,
+	if (len == 0) {
+		PMEMoid ret = tx_alloc_common(tx, sizeof(char), (type_num_t)type_num,
 				constructor_tx_alloc,
 				ALLOC_ARGS(POBJ_FLAG_ZERO));
+        timing_end(allocation);
+        return ret;
+    }
 
 	size_t size = (len + 1) * sizeof(char);
 
-	return tx_alloc_common(tx, size, (type_num_t)type_num,
+	PMEMoid ret = tx_alloc_common(tx, size, (type_num_t)type_num,
 			constructor_tx_alloc, COPY_ARGS(0, s, size));
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2188,6 +2233,7 @@ pmemobj_tx_strdup(const char *s, uint64_t type_num)
 PMEMoid
 pmemobj_tx_wcsdup(const wchar_t *s, uint64_t type_num)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
@@ -2196,20 +2242,27 @@ pmemobj_tx_wcsdup(const wchar_t *s, uint64_t type_num)
 
 	if (NULL == s) {
 		ERR("cannot duplicate NULL string");
-		return obj_tx_abort_null(EINVAL);
+		PMEMoid ret = obj_tx_abort_null(EINVAL);
+        timing_end(allocation);
+        return ret;
 	}
 
 	size_t len = wcslen(s);
 
-	if (len == 0)
-		return tx_alloc_common(tx, sizeof(wchar_t),
+	if (len == 0) {
+		PMEMoid ret = tx_alloc_common(tx, sizeof(wchar_t),
 				(type_num_t)type_num, constructor_tx_alloc,
 				ALLOC_ARGS(POBJ_FLAG_ZERO));
+        timing_end(allocation);
+        return ret;
+    }
 
 	size_t size = (len + 1) * sizeof(wchar_t);
 
-	return tx_alloc_common(tx, size, (type_num_t)type_num,
+	PMEMoid ret = tx_alloc_common(tx, size, (type_num_t)type_num,
 			constructor_tx_alloc, COPY_ARGS(0, s, size));
+    timing_end(allocation);
+    return ret;
 }
 
 /*
@@ -2218,14 +2271,17 @@ pmemobj_tx_wcsdup(const wchar_t *s, uint64_t type_num)
 int
 pmemobj_tx_free(PMEMoid oid)
 {
+    timing_start(allocation);
 	LOG(3, NULL);
 	struct tx *tx = get_tx();
 
 	ASSERT_IN_TX(tx);
 	ASSERT_TX_STAGE_WORK(tx);
 
-	if (OBJ_OID_IS_NULL(oid))
+	if (OBJ_OID_IS_NULL(oid)) {
+        timing_end(allocation);
 		return 0;
+    }
 
 	struct lane_tx_runtime *lane =
 		(struct lane_tx_runtime *)tx->section->runtime;
@@ -2233,18 +2289,23 @@ pmemobj_tx_free(PMEMoid oid)
 
 	if (pop->uuid_lo != oid.pool_uuid_lo) {
 		ERR("invalid pool uuid");
-		return obj_tx_abort_err(EINVAL);
+		int ret = obj_tx_abort_err(EINVAL);
+        timing_end(allocation);
+        return ret;
 	}
 	ASSERT(OBJ_OID_IS_VALID(pop, oid));
 
 	uint64_t *entry = pvector_push_back(lane->undo.ctx[UNDO_FREE]);
 	if (entry == NULL) {
 		ERR("free undo log too large");
-		return obj_tx_abort_err(ENOMEM);
+		int ret = obj_tx_abort_err(ENOMEM);
+        timing_end(allocation);
+        return ret;
 	}
 	*entry = oid.off;
 	pmemops_persist(&pop->p_ops, entry, sizeof(*entry));
 
+    timing_end(allocation);
 	return 0;
 }
 
