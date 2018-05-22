@@ -203,6 +203,7 @@ get_cond(PMEMobjpool *pop, PMEMcond_internal *icp)
 void
 pmemobj_mutex_zero(PMEMobjpool *pop, PMEMmutex *mutexp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p mutex %p", pop, mutexp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(mutexp));
@@ -211,6 +212,7 @@ pmemobj_mutex_zero(PMEMobjpool *pop, PMEMmutex *mutexp)
 	mutexip->pmemmutex.runid = 0;
 	pmemops_persist(&pop->p_ops, &mutexip->pmemmutex.runid,
 				sizeof(mutexip->pmemmutex.runid));
+    timing_end(synchronization);
 }
 
 /*
@@ -222,6 +224,7 @@ pmemobj_mutex_zero(PMEMobjpool *pop, PMEMmutex *mutexp)
 int
 pmemobj_mutex_lock(PMEMobjpool *pop, PMEMmutex *mutexp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p mutex %p", pop, mutexp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(mutexp));
@@ -229,12 +232,16 @@ pmemobj_mutex_lock(PMEMobjpool *pop, PMEMmutex *mutexp)
 	PMEMmutex_internal *mutexip = (PMEMmutex_internal *)mutexp;
 	os_mutex_t *mutex = get_mutex(pop, mutexip);
 
-	if (mutex == NULL)
+	if (mutex == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)mutex % util_alignof(os_mutex_t), 0);
 
-	return os_mutex_lock(mutex);
+	int ret = os_mutex_lock(mutex);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -245,28 +252,35 @@ pmemobj_mutex_lock(PMEMobjpool *pop, PMEMmutex *mutexp)
 int
 pmemobj_mutex_assert_locked(PMEMobjpool *pop, PMEMmutex *mutexp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p mutex %p", pop, mutexp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(mutexp));
 
 	PMEMmutex_internal *mutexip = (PMEMmutex_internal *)mutexp;
 	os_mutex_t *mutex = get_mutex(pop, mutexip);
-	if (mutex == NULL)
+	if (mutex == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)mutex % util_alignof(os_mutex_t), 0);
 
 	int ret = os_mutex_trylock(mutex);
-	if (ret == EBUSY)
+	if (ret == EBUSY) {
+        timing_end(synchronization);
 		return 0;
+    }
 	if (ret == 0) {
 		util_mutex_unlock(mutex);
 		/*
 		 * There's no good error code for this case. EINVAL is used for
 		 * something else here.
 		 */
+        timing_end(synchronization);
 		return ENODEV;
 	}
+    timing_end(synchronization);
 	return ret;
 }
 
@@ -280,18 +294,23 @@ int
 pmemobj_mutex_timedlock(PMEMobjpool *pop, PMEMmutex *__restrict mutexp,
 		const struct timespec *__restrict abs_timeout)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p mutex %p", pop, mutexp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(mutexp));
 
 	PMEMmutex_internal *mutexip = (PMEMmutex_internal *)mutexp;
 	os_mutex_t *mutex = get_mutex(pop, mutexip);
-	if (mutex == NULL)
+	if (mutex == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)mutex % util_alignof(os_mutex_t), 0);
 
-	return os_mutex_timedlock(mutex, abs_timeout);
+	int ret = os_mutex_timedlock(mutex, abs_timeout);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -303,18 +322,23 @@ pmemobj_mutex_timedlock(PMEMobjpool *pop, PMEMmutex *__restrict mutexp,
 int
 pmemobj_mutex_trylock(PMEMobjpool *pop, PMEMmutex *mutexp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p mutex %p", pop, mutexp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(mutexp));
 
 	PMEMmutex_internal *mutexip = (PMEMmutex_internal *)mutexp;
 	os_mutex_t *mutex = get_mutex(pop, mutexip);
-	if (mutex == NULL)
+	if (mutex == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)mutex % util_alignof(os_mutex_t), 0);
 
-	return os_mutex_trylock(mutex);
+	int ret = os_mutex_trylock(mutex);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -323,6 +347,7 @@ pmemobj_mutex_trylock(PMEMobjpool *pop, PMEMmutex *mutexp)
 int
 pmemobj_mutex_unlock(PMEMobjpool *pop, PMEMmutex *mutexp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p mutex %p", pop, mutexp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(mutexp));
@@ -330,12 +355,16 @@ pmemobj_mutex_unlock(PMEMobjpool *pop, PMEMmutex *mutexp)
 	/* XXX potential performance improvement - move GET to debug version */
 	PMEMmutex_internal *mutexip = (PMEMmutex_internal *)mutexp;
 	os_mutex_t *mutex = get_mutex(pop, mutexip);
-	if (mutex == NULL)
+	if (mutex == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)mutex % util_alignof(os_mutex_t), 0);
 
-	return os_mutex_unlock(mutex);
+	int ret = os_mutex_unlock(mutex);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -346,6 +375,7 @@ pmemobj_mutex_unlock(PMEMobjpool *pop, PMEMmutex *mutexp)
 void
 pmemobj_rwlock_zero(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p", pop, rwlockp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(rwlockp));
@@ -354,6 +384,7 @@ pmemobj_rwlock_zero(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 	rwlockip->pmemrwlock.runid = 0;
 	pmemops_persist(&pop->p_ops, &rwlockip->pmemrwlock.runid,
 				sizeof(rwlockip->pmemrwlock.runid));
+    timing_end(synchronization);
 }
 
 /*
@@ -365,18 +396,23 @@ pmemobj_rwlock_zero(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 int
 pmemobj_rwlock_rdlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p", pop, rwlockp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(rwlockp));
 
 	PMEMrwlock_internal *rwlockip = (PMEMrwlock_internal *)rwlockp;
 	os_rwlock_t *rwlock = get_rwlock(pop, rwlockip);
-	if (rwlock == NULL)
+	if (rwlock == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)rwlock % util_alignof(os_rwlock_t), 0);
 
-	return os_rwlock_rdlock(rwlock);
+	int ret = os_rwlock_rdlock(rwlock);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -388,18 +424,23 @@ pmemobj_rwlock_rdlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 int
 pmemobj_rwlock_wrlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p", pop, rwlockp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(rwlockp));
 
 	PMEMrwlock_internal *rwlockip = (PMEMrwlock_internal *)rwlockp;
 	os_rwlock_t *rwlock = get_rwlock(pop, rwlockip);
-	if (rwlock == NULL)
+	if (rwlock == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)rwlock % util_alignof(os_rwlock_t), 0);
 
-	return os_rwlock_wrlock(rwlock);
+	int ret = os_rwlock_wrlock(rwlock);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -412,6 +453,7 @@ int
 pmemobj_rwlock_timedrdlock(PMEMobjpool *pop, PMEMrwlock *__restrict rwlockp,
 			const struct timespec *__restrict abs_timeout)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p timeout sec %ld nsec %ld", pop, rwlockp,
 		abs_timeout->tv_sec, abs_timeout->tv_nsec);
 
@@ -419,12 +461,16 @@ pmemobj_rwlock_timedrdlock(PMEMobjpool *pop, PMEMrwlock *__restrict rwlockp,
 
 	PMEMrwlock_internal *rwlockip = (PMEMrwlock_internal *)rwlockp;
 	os_rwlock_t *rwlock = get_rwlock(pop, rwlockip);
-	if (rwlock == NULL)
+	if (rwlock == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)rwlock % util_alignof(os_rwlock_t), 0);
 
-	return os_rwlock_timedrdlock(rwlock, abs_timeout);
+	int ret = os_rwlock_timedrdlock(rwlock, abs_timeout);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -437,6 +483,7 @@ int
 pmemobj_rwlock_timedwrlock(PMEMobjpool *pop, PMEMrwlock *__restrict rwlockp,
 			const struct timespec *__restrict abs_timeout)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p timeout sec %ld nsec %ld", pop, rwlockp,
 		abs_timeout->tv_sec, abs_timeout->tv_nsec);
 
@@ -444,12 +491,16 @@ pmemobj_rwlock_timedwrlock(PMEMobjpool *pop, PMEMrwlock *__restrict rwlockp,
 
 	PMEMrwlock_internal *rwlockip = (PMEMrwlock_internal *)rwlockp;
 	os_rwlock_t *rwlock = get_rwlock(pop, rwlockip);
-	if (rwlock == NULL)
+	if (rwlock == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)rwlock % util_alignof(os_rwlock_t), 0);
 
-	return os_rwlock_timedwrlock(rwlock, abs_timeout);
+	int ret = os_rwlock_timedwrlock(rwlock, abs_timeout);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -461,18 +512,23 @@ pmemobj_rwlock_timedwrlock(PMEMobjpool *pop, PMEMrwlock *__restrict rwlockp,
 int
 pmemobj_rwlock_tryrdlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p", pop, rwlockp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(rwlockp));
 
 	PMEMrwlock_internal *rwlockip = (PMEMrwlock_internal *)rwlockp;
 	os_rwlock_t *rwlock = get_rwlock(pop, rwlockip);
-	if (rwlock == NULL)
+	if (rwlock == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)rwlock % util_alignof(os_rwlock_t), 0);
 
-	return os_rwlock_tryrdlock(rwlock);
+	int ret = os_rwlock_tryrdlock(rwlock);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -484,18 +540,23 @@ pmemobj_rwlock_tryrdlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 int
 pmemobj_rwlock_trywrlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p", pop, rwlockp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(rwlockp));
 
 	PMEMrwlock_internal *rwlockip = (PMEMrwlock_internal *)rwlockp;
 	os_rwlock_t *rwlock = get_rwlock(pop, rwlockip);
-	if (rwlock == NULL)
+	if (rwlock == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)rwlock % util_alignof(os_rwlock_t), 0);
 
-	return os_rwlock_trywrlock(rwlock);
+	int ret = os_rwlock_trywrlock(rwlock);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -504,6 +565,7 @@ pmemobj_rwlock_trywrlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 int
 pmemobj_rwlock_unlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p rwlock %p", pop, rwlockp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(rwlockp));
@@ -511,12 +573,16 @@ pmemobj_rwlock_unlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 	/* XXX potential performance improvement - move GET to debug version */
 	PMEMrwlock_internal *rwlockip = (PMEMrwlock_internal *)rwlockp;
 	os_rwlock_t *rwlock = get_rwlock(pop, rwlockip);
-	if (rwlock == NULL)
+	if (rwlock == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)rwlock % util_alignof(os_rwlock_t), 0);
 
-	return os_rwlock_unlock(rwlock);
+	int ret = os_rwlock_unlock(rwlock);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -527,6 +593,7 @@ pmemobj_rwlock_unlock(PMEMobjpool *pop, PMEMrwlock *rwlockp)
 void
 pmemobj_cond_zero(PMEMobjpool *pop, PMEMcond *condp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p cond %p", pop, condp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(condp));
@@ -535,6 +602,7 @@ pmemobj_cond_zero(PMEMobjpool *pop, PMEMcond *condp)
 	condip->pmemcond.runid = 0;
 	pmemops_persist(&pop->p_ops, &condip->pmemcond.runid,
 			sizeof(condip->pmemcond.runid));
+    timing_end(synchronization);
 }
 
 /*
@@ -546,18 +614,23 @@ pmemobj_cond_zero(PMEMobjpool *pop, PMEMcond *condp)
 int
 pmemobj_cond_broadcast(PMEMobjpool *pop, PMEMcond *condp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p cond %p", pop, condp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(condp));
 
 	PMEMcond_internal *condip = (PMEMcond_internal *)condp;
 	os_cond_t *cond = get_cond(pop, condip);
-	if (cond == NULL)
+	if (cond == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)cond % util_alignof(os_cond_t), 0);
 
-	return os_cond_broadcast(cond);
+	int ret = os_cond_broadcast(cond);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -569,18 +642,23 @@ pmemobj_cond_broadcast(PMEMobjpool *pop, PMEMcond *condp)
 int
 pmemobj_cond_signal(PMEMobjpool *pop, PMEMcond *condp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p cond %p", pop, condp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(condp));
 
 	PMEMcond_internal *condip = (PMEMcond_internal *)condp;
 	os_cond_t *cond = get_cond(pop, condip);
-	if (cond == NULL)
+	if (cond == NULL) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)cond % util_alignof(os_cond_t), 0);
 
-	return os_cond_signal(cond);
+	int ret = os_cond_signal(cond);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -594,6 +672,7 @@ pmemobj_cond_timedwait(PMEMobjpool *pop, PMEMcond *__restrict condp,
 			PMEMmutex *__restrict mutexp,
 			const struct timespec *__restrict abs_timeout)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p cond %p mutex %p abstime sec %ld nsec %ld", pop, condp,
 		mutexp, abs_timeout->tv_sec, abs_timeout->tv_nsec);
 
@@ -604,13 +683,17 @@ pmemobj_cond_timedwait(PMEMobjpool *pop, PMEMcond *__restrict condp,
 	PMEMmutex_internal *mutexip = (PMEMmutex_internal *)mutexp;
 	os_cond_t *cond = get_cond(pop, condip);
 	os_mutex_t *mutex = get_mutex(pop, mutexip);
-	if ((cond == NULL) || (mutex == NULL))
+	if ((cond == NULL) || (mutex == NULL)) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)mutex % util_alignof(os_mutex_t), 0);
 	ASSERTeq((uintptr_t)cond % util_alignof(os_cond_t), 0);
 
-	return os_cond_timedwait(cond, mutex, abs_timeout);
+	int ret = os_cond_timedwait(cond, mutex, abs_timeout);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
@@ -623,6 +706,7 @@ int
 pmemobj_cond_wait(PMEMobjpool *pop, PMEMcond *condp,
 			PMEMmutex *__restrict mutexp)
 {
+    timing_start(synchronization);
 	LOG(3, "pop %p cond %p mutex %p", pop, condp, mutexp);
 
 	ASSERTeq(pop, pmemobj_pool_by_ptr(mutexp));
@@ -632,11 +716,15 @@ pmemobj_cond_wait(PMEMobjpool *pop, PMEMcond *condp,
 	PMEMmutex_internal *mutexip = (PMEMmutex_internal *)mutexp;
 	os_cond_t *cond = get_cond(pop, condip);
 	os_mutex_t *mutex = get_mutex(pop, mutexip);
-	if ((cond == NULL) || (mutex == NULL))
+	if ((cond == NULL) || (mutex == NULL)) {
+        timing_end(synchronization);
 		return EINVAL;
+    }
 
 	ASSERTeq((uintptr_t)mutex % util_alignof(os_mutex_t), 0);
 	ASSERTeq((uintptr_t)cond % util_alignof(os_cond_t), 0);
 
-	return os_cond_wait(cond, mutex);
+	int ret = os_cond_wait(cond, mutex);
+    timing_end(synchronization);
+    return ret;
 }

@@ -1320,11 +1320,14 @@ err_abort:
 int
 pmemobj_tx_lock(enum pobj_tx_param type, void *lockp)
 {
+    timing_start(synchronization);
 	struct tx *tx = get_tx();
 	ASSERT_IN_TX(tx);
 	ASSERT_TX_STAGE_WORK(tx);
 
-	return add_to_tx_and_lock(tx, type, lockp);
+	int ret = add_to_tx_and_lock(tx, type, lockp);
+    timing_end(synchronization);
+    return ret;
 }
 
 /*
