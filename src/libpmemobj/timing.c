@@ -40,6 +40,7 @@ void timing_print(void) {
             ((timing_struct *)ptr)->total[i] = 0;
         }
         total_errors += ((timing_struct *)ptr)->total_errors;
+        ((timing_struct *)ptr)->total_errors = 0;
         ptr = ((timing_struct *)ptr)->next_ptr;
     }
     FILE *out = stdout;
