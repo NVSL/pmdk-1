@@ -1235,7 +1235,6 @@ PMEMobjpool *
 pmemobj_createU(const char *path, const char *layout,
 		size_t poolsize, mode_t mode)
 {
-    timing_init();
 	LOG(3, "path %s layout %s poolsize %zu mode %o",
 			path, layout, poolsize, mode);
 
@@ -1246,6 +1245,7 @@ pmemobj_createU(const char *path, const char *layout,
 	if (layout && (strlen(layout) >= PMEMOBJ_MAX_LAYOUT)) {
 		ERR("Layout too long");
 		errno = EINVAL;
+        timing_init();
 		return NULL;
 	}
 
@@ -1262,6 +1262,7 @@ pmemobj_createU(const char *path, const char *layout,
 			PMEMOBJ_MIN_PART, &Obj_create_attr, &runtime_nlanes,
 			REPLICAS_ENABLED) != 0) {
 		LOG(2, "cannot create pool or pool set");
+        timing_init();
 		return NULL;
 	}
 
@@ -1315,7 +1316,7 @@ pmemobj_createU(const char *path, const char *layout,
 	util_poolset_fdclose(set);
 
 	LOG(3, "pop %p", pop);
-
+    timing_init();
 	return pop;
 
 err:
@@ -1325,6 +1326,7 @@ err:
 		obj_cleanup_remote(pop);
 	util_poolset_close(set, DELETE_CREATED_PARTS);
 	errno = oerrno;
+    timing_init();
 	return NULL;
 }
 
@@ -1703,10 +1705,10 @@ static inline
 PMEMobjpool *
 pmemobj_openU(const char *path, const char *layout)
 {
-    timing_init();
 	LOG(3, "path %s layout %s", path, layout);
 
 	PMEMobjpool *pop = obj_open_common(path, layout, Open_cow, 1);
+    timing_init();
     return pop;
 }
 
