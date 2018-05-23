@@ -3,17 +3,29 @@
 #include <stdio.h>
 #include <string.h>
 
-#define THRESHOLD 1E12 // no operation should take longer
+#define THRESHOLD 1E10 // no operation should take longer
 #define CAS(a, b, c) __sync_bool_compare_and_swap(a, b, c)
-#define RDTSC(output) asm volatile( \
+#define RDTSCP(output) asm volatile( \
     "rdtscp \n" \
-    "mfence \n" \
+    "lfence \n" \
     "shl $32, %%rdx \n" \
     "mov %%eax, %%edx \n" \
     "mov %%rdx, %[time] \n" \
     : \
     : [time] "m" (output) \
     : "rdx", "rax", "rcx")
+
+uint64_t rdtscp(void);
+
+uint64_t rdtscp(void) {
+    uint32_t lo, hi;
+    __asm__ volatile ("rdtscp"
+        : "=a" (lo), "=d" (hi)
+        :
+        : "%rcx");
+    asm volatile("lfence" ::: "memory");
+    return (uint64_t)lo | (((uint64_t)hi) << 32);
+}
 
 typedef struct timing_struct {
     uint32_t current_mode;
@@ -27,7 +39,8 @@ uint64_t head = 0;
 uint64_t init_cycle = 0;
 
 void timing_init(void) {
-    RDTSC(init_cycle);
+    if (init_cycle != 0) return;
+    init_cycle = rdtscp();
 }
 
 void timing_print(void) {
@@ -50,12 +63,9 @@ void timing_print(void) {
     fprintf(out, "Synchronization,%zu\n", total[2]);
     fprintf(out, "Allocation,%zu\n", total[3]);
     fprintf(out, "Errors,%d\n", total_errors);
-    uint64_t print_cycle;
-    RDTSC(print_cycle);
-    asm volatile("mfence" ::: "memory");
-    uint64_t total_cycles = print_cycle - init_cycle;
+    uint64_t total_cycles = rdtscp() - init_cycle;
     fprintf(out, "Total,%zu\n", total_cycles);
-    asm volatile("mfence" ::: "memory");
+    init_cycle = 0;
     timing_init();
 }
 
@@ -81,12 +91,12 @@ void timing_start(uint32_t mode) {
 
     if (my_timing->current_mode != (uint32_t)idle) return; // not idle
     my_timing->current_mode = mode;
-    RDTSC(my_timing->t1);
+    RDTSCP(my_timing->t1);
 }
 
 void timing_end(uint32_t mode) {
     if (my_timing->current_mode != mode) return;
-    RDTSC(my_timing->t2);
+    RDTSCP(my_timing->t2);
     uint64_t latency = my_timing->t2 - my_timing->t1;
     if (latency < THRESHOLD) my_timing->total[mode - 1] += latency;
     else my_timing->total_errors++;
