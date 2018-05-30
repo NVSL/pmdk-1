@@ -34,6 +34,9 @@
 #
 LIBPMEMOBJ_1.0 {
 	global:
+        timing_record_start;
+        timing_record_break;
+        timing_record_stop;
 		pmemobj_check_version;
 		pmemobj_set_funcs;
 		pmemobj_errormsg;

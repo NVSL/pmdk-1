@@ -45,6 +45,10 @@
 extern "C" {
 #endif
 
+void timing_record_start(void);
+void timing_record_break(void);
+void timing_record_stop(void);
+
 /*
  * Transactions
  *

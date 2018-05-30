@@ -65,6 +65,9 @@ void timing_print(void) {
     fprintf(out, "Errors,%d\n", total_errors);
     uint64_t total_cycles = rdtscp() - init_cycle;
     fprintf(out, "Total,%zu\n", total_cycles);
+    // DEBUG
+    timing_record_print(out);
+    // DEBUG
     init_cycle = 0;
     timing_init();
 }
@@ -101,4 +104,32 @@ void timing_end(uint32_t mode) {
     if (latency < THRESHOLD) my_timing->total[mode - 1] += latency;
     else my_timing->total_errors++;
     my_timing->current_mode = (uint32_t)idle; // idle
+}
+
+static uint64_t total[2] = {0, 0};
+static uint64_t last_snapshot = 0;
+static uint64_t active_break = 0;
+
+void timing_record_start(void) {
+    last_snapshot = rdtscp();
+}
+
+void timing_record_break(void) {
+    uint64_t t = rdtscp();
+    if (t - last_snapshot < THRESHOLD)
+        total[active_break++] += (t - last_snapshot);
+    last_snapshot = t;
+}
+
+void timing_record_stop(void) {
+    uint64_t t = rdtscp();
+    if (t - last_snapshot < THRESHOLD)
+        total[active_break] += (t - last_snapshot);
+    active_break = 0;
+}
+
+void timing_record_print(FILE *out) {
+    for (int i = 0; i < 2; i++) {
+        fprintf(out, "Record[%d],%zu\n", i, total[i]);
+    }
 }

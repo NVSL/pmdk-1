@@ -73,6 +73,7 @@ template <typename T, typename... Args>
 typename detail::pp_if_not_array<T>::type
 make_persistent(Args &&... args)
 {
+    timing_record_start();
 	if (pmemobj_tx_stage() != TX_STAGE_WORK)
 		throw transaction_scope_error(
 			"refusing to allocate "
@@ -80,6 +81,7 @@ make_persistent(Args &&... args)
 
 	persistent_ptr<T> ptr =
 		pmemobj_tx_alloc(sizeof(T), detail::type_num<T>());
+    timing_record_break(); // Allocation
 
 	if (ptr == nullptr)
 		throw transaction_alloc_error("failed to allocate "
@@ -91,6 +93,7 @@ make_persistent(Args &&... args)
 		pmemobj_tx_free(*ptr.raw_ptr());
 		throw;
 	}
+    timing_record_stop(); // Constructor
 
 	return ptr;
 }

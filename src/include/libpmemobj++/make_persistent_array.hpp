@@ -71,6 +71,7 @@ template <typename T>
 typename detail::pp_if_array<T>::type
 make_persistent(std::size_t N)
 {
+    timing_record_start();
 	typedef typename detail::pp_array_type<T>::type I;
 
 	if (pmemobj_tx_stage() != TX_STAGE_WORK)
@@ -84,6 +85,7 @@ make_persistent(std::size_t N)
 	if (ptr == nullptr)
 		throw transaction_alloc_error("failed to allocate "
 					      "persistent memory array");
+    timing_record_break(); // Allocation
 
 	std::size_t i;
 	try {
@@ -95,6 +97,7 @@ make_persistent(std::size_t N)
 		pmemobj_tx_free(*ptr.raw_ptr());
 		throw;
 	}
+    timing_record_stop(); // Constructor
 
 	return ptr;
 }
